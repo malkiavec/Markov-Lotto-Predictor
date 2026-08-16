@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "NY Lotto Ensemble"
+description = "An interactive NY Lotto 6/59 analysis dashboard based on the uploaded Markov, HMM/Viterbi, sum-transition, random-forest, neural-network, frequency, and filter ensemble workflow. It loads the latest public draw history, explains the model signals, and generates filter-aware candidate tickets."
+version = "1.0.0"
+id = "artifacts/ny-lotto-ensemble"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22094
+
+[services.development]
+run = "pnpm --filter @workspace/ny-lotto-ensemble run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ny-lotto-ensemble", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/ny-lotto-ensemble/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22094"
+BASE_PATH = "/"

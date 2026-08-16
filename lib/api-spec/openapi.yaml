@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: lotto
+    description: NY Lotto ensemble analysis
 paths:
   /healthz:
     get:
@@ -24,6 +26,65 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /lotto/analysis:
+    get:
+      operationId: getLottoAnalysis
+      tags: [lotto]
+      summary: Run NY Lotto ensemble analysis
+      description: Loads the public NY Lotto 6/59 draw history and runs the uploaded ensemble workflow.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 100
+            maximum: 5000
+            default: 5000
+        - name: seed
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 0
+            maximum: 2147483647
+            default: 42
+      responses:
+        "200":
+          description: Ensemble analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LottoAnalysis"
+        "502":
+          description: Upstream data source unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /lotto/draws:
+    get:
+      operationId: getLottoDraws
+      tags: [lotto]
+      summary: Get recent NY Lotto draws
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 5
+            maximum: 100
+            default: 12
+      responses:
+        "200":
+          description: Recent draws
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LottoDraw"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +94,143 @@ components:
           type: string
       required:
         - status
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    LottoDraw:
+      type: object
+      properties:
+        date:
+          type: string
+        numbers:
+          type: array
+          items:
+            type: number
+        bonus:
+            type: ["number", "null"]
+      required: [date, numbers, bonus]
+    LottoWeights:
+      type: object
+      properties:
+        markov:
+          type: number
+        hmm:
+          type: number
+        sum:
+          type: number
+        rf:
+          type: number
+        nn:
+          type: number
+        frequency:
+          type: number
+      required: [markov, hmm, sum, rf, nn, frequency]
+    LottoModelSignal:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        numbers:
+          type: array
+          items:
+            type: number
+        weight:
+          type: number
+      required: [name, description, numbers, weight]
+    LottoLag:
+      type: object
+      properties:
+        lag:
+          type: number
+        absoluteCorrelation:
+          type: number
+        correlation:
+          type: number
+      required: [lag, absoluteCorrelation, correlation]
+    LottoFilter:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        passed:
+          type: boolean
+      required: [name, description, passed]
+    LottoAnalysis:
+      type: object
+      properties:
+        source:
+          type: string
+        generatedAt:
+          type: string
+        drawsLoaded:
+          type: number
+        latestDraw:
+          $ref: "#/components/schemas/LottoDraw"
+        ticket:
+          type: array
+          items:
+            type: number
+        ticketScore:
+          type: number
+        ticketFilters:
+          type: array
+          items:
+            $ref: "#/components/schemas/LottoFilter"
+        signals:
+          type: array
+          items:
+            $ref: "#/components/schemas/LottoModelSignal"
+        lags:
+          type: array
+          items:
+            $ref: "#/components/schemas/LottoLag"
+        frequency:
+          type: array
+          items:
+            type: object
+            properties:
+              number:
+                type: number
+              count:
+                type: number
+            required: [number, count]
+        recentDraws:
+          type: array
+          items:
+            $ref: "#/components/schemas/LottoDraw"
+        transitions:
+          type: array
+          items:
+            type: object
+            properties:
+              from:
+                type: number
+              to:
+                type: number
+              probability:
+                type: number
+            required: [from, to, probability]
+        weights:
+          $ref: "#/components/schemas/LottoWeights"
+      required:
+        - source
+        - generatedAt
+        - drawsLoaded
+        - latestDraw
+        - ticket
+        - ticketScore
+        - ticketFilters
+        - signals
+        - lags
+        - frequency
+        - recentDraws
+        - transitions
+        - weights
 

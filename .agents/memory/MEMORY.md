@@ -1,0 +1,1 @@
+- [OpenAPI integer compatibility](openapi-integer-compatibility.md) — this workspace's generated Zod client uses zod 3, so integer schemas need numeric validation that avoids zod.int().
