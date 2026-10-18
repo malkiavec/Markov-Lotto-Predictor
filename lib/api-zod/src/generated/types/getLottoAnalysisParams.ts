@@ -8,8 +8,8 @@
 
 export type GetLottoAnalysisParams = {
 /**
- * @minimum 5
- * @maximum 100
+ * @minimum 100
+ * @maximum 5000
  */
 limit?: number;
 /**
@@ -17,13 +17,4 @@ limit?: number;
  * @maximum 2147483647
  */
 seed?: number;
-/**
- * @minLength 2
- * @maxLength 3
- */
-stateCode?: string;
-/**
- * @minimum 1
- */
-gameId?: number;
 };

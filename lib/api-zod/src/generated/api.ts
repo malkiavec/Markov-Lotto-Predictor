@@ -18,73 +18,26 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * @summary Get states supported by the lottery data provider
- */
-export const GetLottoStatesResponseItem = zod.object({
-  "stateCode": zod.string(),
-  "stateName": zod.string()
-})
-export const GetLottoStatesResponse = zod.array(GetLottoStatesResponseItem)
-
-
-/**
- * @summary Get lottery games available in a state
- */
-export const getLottoGamesQueryStateCodeMin = 2;
-export const getLottoGamesQueryStateCodeMax = 3;
-
-
-
-export const GetLottoGamesQueryParams = zod.object({
-  "stateCode": zod.coerce.string().min(getLottoGamesQueryStateCodeMin).max(getLottoGamesQueryStateCodeMax)
-})
-
-export const GetLottoGamesResponseItem = zod.object({
-  "id": zod.number(),
-  "gameName": zod.string(),
-  "stateCode": zod.string(),
-  "minBall": zod.number(),
-  "maxBall": zod.number(),
-  "drawnNumbers": zod.number()
-})
-export const GetLottoGamesResponse = zod.array(GetLottoGamesResponseItem)
-
-
-/**
  * Loads the public NY Lotto 6/59 draw history and runs the uploaded ensemble workflow.
  * @summary Run NY Lotto ensemble analysis
  */
-export const getLottoAnalysisQueryLimitDefault = 40;
-export const getLottoAnalysisQueryLimitMin = 5;
-export const getLottoAnalysisQueryLimitMax = 100;
+export const getLottoAnalysisQueryLimitDefault = 5000;
+export const getLottoAnalysisQueryLimitMin = 100;
+export const getLottoAnalysisQueryLimitMax = 5000;
 
 export const getLottoAnalysisQuerySeedDefault = 42;
 export const getLottoAnalysisQuerySeedMin = 0;
 export const getLottoAnalysisQuerySeedMax = 2147483647;
 
-export const getLottoAnalysisQueryStateCodeDefault = `NY`;
-export const getLottoAnalysisQueryStateCodeMin = 2;
-export const getLottoAnalysisQueryStateCodeMax = 3;
-
-export const getLottoAnalysisQueryGameIdDefault = 9;
-
 
 
 export const GetLottoAnalysisQueryParams = zod.object({
   "limit": zod.coerce.number().min(getLottoAnalysisQueryLimitMin).max(getLottoAnalysisQueryLimitMax).default(getLottoAnalysisQueryLimitDefault),
-  "seed": zod.coerce.number().min(getLottoAnalysisQuerySeedMin).max(getLottoAnalysisQuerySeedMax).default(getLottoAnalysisQuerySeedDefault),
-  "stateCode": zod.coerce.string().min(getLottoAnalysisQueryStateCodeMin).max(getLottoAnalysisQueryStateCodeMax).default(getLottoAnalysisQueryStateCodeDefault),
-  "gameId": zod.coerce.number().min(1).default(getLottoAnalysisQueryGameIdDefault)
+  "seed": zod.coerce.number().min(getLottoAnalysisQuerySeedMin).max(getLottoAnalysisQuerySeedMax).default(getLottoAnalysisQuerySeedDefault)
 })
 
 export const GetLottoAnalysisResponse = zod.object({
   "source": zod.string(),
-  "stateCode": zod.string(),
-  "stateName": zod.string(),
-  "gameId": zod.number(),
-  "gameName": zod.string(),
-  "maxBall": zod.number(),
-  "mainNumberCount": zod.number(),
   "generatedAt": zod.string(),
   "drawsLoaded": zod.number(),
   "latestDraw": zod.object({
@@ -142,18 +95,10 @@ export const getLottoDrawsQueryLimitDefault = 12;
 export const getLottoDrawsQueryLimitMin = 5;
 export const getLottoDrawsQueryLimitMax = 100;
 
-export const getLottoDrawsQueryStateCodeDefault = `NY`;
-export const getLottoDrawsQueryStateCodeMin = 2;
-export const getLottoDrawsQueryStateCodeMax = 3;
-
-export const getLottoDrawsQueryGameIdDefault = 9;
-
 
 
 export const GetLottoDrawsQueryParams = zod.object({
-  "limit": zod.coerce.number().min(getLottoDrawsQueryLimitMin).max(getLottoDrawsQueryLimitMax).default(getLottoDrawsQueryLimitDefault),
-  "stateCode": zod.coerce.string().min(getLottoDrawsQueryStateCodeMin).max(getLottoDrawsQueryStateCodeMax).default(getLottoDrawsQueryStateCodeDefault),
-  "gameId": zod.coerce.number().min(1).default(getLottoDrawsQueryGameIdDefault)
+  "limit": zod.coerce.number().min(getLottoDrawsQueryLimitMin).max(getLottoDrawsQueryLimitMax).default(getLottoDrawsQueryLimitDefault)
 })
 
 export const GetLottoDrawsResponseItem = zod.object({

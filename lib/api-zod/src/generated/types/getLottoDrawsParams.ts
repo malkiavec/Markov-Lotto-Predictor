@@ -12,13 +12,4 @@ export type GetLottoDrawsParams = {
  * @maximum 100
  */
 limit?: number;
-/**
- * @minLength 2
- * @maxLength 3
- */
-stateCode?: string;
-/**
- * @minimum 1
- */
-gameId?: number;
 };
