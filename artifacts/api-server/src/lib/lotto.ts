@@ -7,7 +7,7 @@ import type {
   LottoWeights,
 } from "@workspace/api-zod";
 
-const SOCRATA_ENDPOINT = "https://data.ny.gov/resource/6nbc-h7bj.json";
+const SOCRATA_ENDPOINT = "https://data.ny.gov/api/v3/views/6nbc-h7bj/query.json";
 const N_MAX = 59;
 const PICKS = 6;
 const SOURCE = "data.ny.gov · NY Lotto 6/59";
@@ -62,13 +62,18 @@ function toDraw(row: RawDraw): LottoDraw | null {
 }
 
 export async function fetchLottoDraws(limit: number): Promise<LottoDraw[]> {
-  const url = new URL(SOCRATA_ENDPOINT);
-  url.searchParams.set("$limit", String(limit));
-  url.searchParams.set("$order", "draw_date ASC");
-
-  const response = await fetch(url, {
+  const response = await fetch(SOCRATA_ENDPOINT, {
+    method: "POST",
     signal: AbortSignal.timeout(20_000),
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query: "SELECT `draw_date`, `winning_numbers`, `bonus` ORDER BY `draw_date` DESC",
+      page: { pageNumber: 1, pageSize: limit },
+      includeSynthetic: false,
+    }),
   });
   if (!response.ok) {
     throw new Error(`NY data source returned ${response.status}`);
@@ -78,7 +83,8 @@ export async function fetchLottoDraws(limit: number): Promise<LottoDraw[]> {
   const draws = rows
     .map(toDraw)
     .filter((draw): draw is LottoDraw => draw !== null)
-    .filter((draw) => draw.numbers.length === PICKS);
+    .filter((draw) => draw.numbers.length === PICKS)
+    .sort((left, right) => left.date.localeCompare(right.date));
 
   if (draws.length < 50) {
     throw new Error("NY data source returned too few valid draws");
