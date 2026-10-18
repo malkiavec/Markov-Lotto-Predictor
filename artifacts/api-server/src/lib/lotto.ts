@@ -8,10 +8,10 @@ import type {
   LottoState,
   LottoWeights,
 } from "@workspace/api-zod";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 
+const connectors = new ReplitConnectors();
 const RAPIDAPI_PREFIX = "/lottery-results";
-const RAPIDAPI_HOST = "usa-lottery-result-all-state-api.p.rapidapi.com";
-const RAPIDAPI_BASE_URL = `https://${RAPIDAPI_HOST}/`;
 const HISTORY_CACHE_TTL = 15 * 60 * 1000;
 const METADATA_CACHE_TTL = 60 * 60 * 1000;
 
@@ -93,21 +93,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 async function rapidApiJson(path: string): Promise<unknown> {
-  const apiKey = process.env.RAPIDAPI_API_KEY;
-  if (!apiKey) {
-    throw new Error("RAPIDAPI_API_KEY Replit Secret is not configured");
-  }
-
-  const response = await fetch(new URL(path.replace(/^\/+/, ""), RAPIDAPI_BASE_URL), {
-    method: "GET",
-    headers: {
-      accept: "application/json",
-      "x-rapidapi-host": RAPIDAPI_HOST,
-      "x-rapidapi-key": apiKey,
-    },
-    redirect: "error",
-    signal: AbortSignal.timeout(20_000),
-  });
+  const response = await connectors.proxy("rapidapi", path, { method: "GET" });
   if (!response.ok) {
     const message = await response.text().catch(() => "");
     throw new Error(
