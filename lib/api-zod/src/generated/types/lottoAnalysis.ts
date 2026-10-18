@@ -15,6 +15,12 @@ import type { LottoWeights } from './lottoWeights';
 
 export interface LottoAnalysis {
   source: string;
+  stateCode: string;
+  stateName: string;
+  gameId: number;
+  gameName: string;
+  maxBall: number;
+  mainNumberCount: number;
   generatedAt: string;
   drawsLoaded: number;
   latestDraw: LottoDraw;

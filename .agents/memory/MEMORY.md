@@ -1,1 +1,2 @@
 - [OpenAPI integer compatibility](openapi-integer-compatibility.md) — this workspace's generated Zod client uses zod 3, so integer schemas need numeric validation that avoids zod.int().
+- [RapidAPI subdomain configuration](rapidapi-subdomain.md) — configure the provider subdomain, not a full hostname, or proxy requests can fail TLS validation.

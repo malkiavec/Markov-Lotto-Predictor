@@ -20,6 +20,20 @@ export interface LottoDraw {
   bonus: number | null;
 }
 
+export interface LottoState {
+  stateCode: string;
+  stateName: string;
+}
+
+export interface LottoGame {
+  id: number;
+  gameName: string;
+  stateCode: string;
+  minBall: number;
+  maxBall: number;
+  drawnNumbers: number;
+}
+
 export interface LottoWeights {
   markov: number;
   hmm: number;
@@ -61,6 +75,12 @@ export type LottoAnalysisTransitionsItem = {
 
 export interface LottoAnalysis {
   source: string;
+  stateCode: string;
+  stateName: string;
+  gameId: number;
+  gameName: string;
+  maxBall: number;
+  mainNumberCount: number;
   generatedAt: string;
   drawsLoaded: number;
   latestDraw: LottoDraw;
@@ -75,10 +95,18 @@ export interface LottoAnalysis {
   weights: LottoWeights;
 }
 
+export type GetLottoGamesParams = {
+/**
+ * @minLength 2
+ * @maxLength 3
+ */
+stateCode: string;
+};
+
 export type GetLottoAnalysisParams = {
 /**
- * @minimum 100
- * @maximum 5000
+ * @minimum 5
+ * @maximum 100
  */
 limit?: number;
 /**
@@ -86,6 +114,15 @@ limit?: number;
  * @maximum 2147483647
  */
 seed?: number;
+/**
+ * @minLength 2
+ * @maxLength 3
+ */
+stateCode?: string;
+/**
+ * @minimum 1
+ */
+gameId?: number;
 };
 
 export type GetLottoDrawsParams = {
@@ -94,5 +131,14 @@ export type GetLottoDrawsParams = {
  * @maximum 100
  */
 limit?: number;
+/**
+ * @minLength 2
+ * @maxLength 3
+ */
+stateCode?: string;
+/**
+ * @minimum 1
+ */
+gameId?: number;
 };
 

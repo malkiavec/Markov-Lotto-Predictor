@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import {
   Activity,
@@ -29,8 +29,8 @@ import {
   TrendingUp,
   X,
 } from 'lucide-react';
-import { useGetLottoAnalysis, useGetLottoDraws, useHealthCheck, getGetLottoAnalysisQueryKey, getGetLottoDrawsQueryKey, getHealthCheckQueryKey } from '@workspace/api-client-react';
-import type { LottoAnalysis, LottoDraw, LottoFilter, LottoLag, LottoModelSignal } from '@workspace/api-client-react';
+import { useGetLottoAnalysis, useGetLottoGames, useGetLottoStates, useHealthCheck, getGetLottoAnalysisQueryKey, getGetLottoGamesQueryKey, getGetLottoStatesQueryKey, getHealthCheckQueryKey } from '@workspace/api-client-react';
+import type { LottoAnalysis, LottoDraw, LottoFilter, LottoGame, LottoLag, LottoModelSignal, LottoState } from '@workspace/api-client-react';
 
 const numberFormat = new Intl.NumberFormat('en-US');
 type IconComponent = (props: { className?: string }) => ReactNode;
@@ -145,7 +145,7 @@ function ErrorWorkspace({ onRetry, message }: { onRetry: () => void; message: st
   );
 }
 
-function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
+function Sidebar({ mobileOpen, onClose, state, game }: { mobileOpen: boolean; onClose: () => void; state: string; game?: LottoGame }) {
   return (
     <>
       {mobileOpen && <button data-testid="button-close-mobile-nav" aria-label="Close navigation" onClick={onClose} className="fixed inset-0 z-30 bg-[#17232a]/35 lg:hidden"><X className="sr-only" /></button>}
@@ -156,7 +156,7 @@ function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
               <Dices className="h-4 w-4" />
               <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#eec46f]" />
             </div>
-            <div><p className="font-[var(--app-font-serif)] text-sm font-bold tracking-[-.02em]">Northstar Lab</p><p className="font-mono text-[8px] uppercase tracking-[.18em] text-sidebar-foreground/45">NY · 6 / 59</p></div>
+            <div><p className="font-[var(--app-font-serif)] text-sm font-bold tracking-[-.02em]">Northstar Lab</p><p className="max-w-[150px] truncate font-mono text-[8px] uppercase tracking-[.14em] text-sidebar-foreground/45">{state} · {game ? `${game.drawnNumbers} / ${game.maxBall}` : 'Lottery'}</p></div>
           </div>
           <button data-testid="button-close-nav" aria-label="Close navigation" onClick={onClose} className="rounded-lg p-1 text-sidebar-foreground/50 hover:bg-sidebar-accent lg:hidden"><X className="h-4 w-4" /></button>
         </div>
@@ -182,17 +182,33 @@ function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => 
 }
 
 function AnalysisPage() {
-  const [limit, setLimit] = useState('1000');
+  const [limit, setLimit] = useState('40');
   const [seed, setSeed] = useState('');
-  const [applied, setApplied] = useState({ limit: 1000, seed: undefined as number | undefined });
+  const [stateCode, setStateCode] = useState('NY');
+  const [gameId, setGameId] = useState(9);
+  const [applied, setApplied] = useState({ limit: 40, seed: undefined as number | undefined, stateCode: 'NY', gameId: 9 });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
-  const analysisParams = useMemo(() => ({ limit: applied.limit, seed: applied.seed }), [applied]);
-  const analysisQuery = useGetLottoAnalysis(analysisParams, { query: { queryKey: getGetLottoAnalysisQueryKey(analysisParams), staleTime: 60_000 } });
-  const drawsQuery = useGetLottoDraws({ limit: 12 }, { query: { queryKey: getGetLottoDrawsQueryKey({ limit: 12 }), staleTime: 60_000 } });
+  const statesQuery = useGetLottoStates({ query: { queryKey: getGetLottoStatesQueryKey(), staleTime: 3_600_000, retry: false } });
+  const states = (statesQuery.data ?? []) as LottoState[];
+  const gamesParams = useMemo(() => ({ stateCode }), [stateCode]);
+  const gamesQuery = useGetLottoGames(gamesParams, { query: { queryKey: getGetLottoGamesQueryKey(gamesParams), enabled: Boolean(stateCode), staleTime: 3_600_000, retry: false } });
+  const games = (gamesQuery.data ?? []) as LottoGame[];
+  const selectedGame = games.find((game) => game.id === gameId);
+  useEffect(() => {
+    if (games.length > 0 && !games.some((game) => game.id === gameId)) {
+      setGameId(games[0].id);
+    }
+  }, [games, gameId]);
+  const analysisParams = useMemo(() => ({ limit: applied.limit, seed: applied.seed, stateCode: applied.stateCode, gameId: applied.gameId }), [applied]);
+  const analysisEnabled = Boolean(
+    stateCode === applied.stateCode &&
+    games.some((game) => game.id === applied.gameId),
+  );
+  const analysisQuery = useGetLottoAnalysis(analysisParams, { query: { queryKey: getGetLottoAnalysisQueryKey(analysisParams), enabled: analysisEnabled, staleTime: 60_000, retry: false } });
   const healthQuery = useHealthCheck({ query: { queryKey: getHealthCheckQueryKey(), staleTime: 30_000, refetchInterval: 30_000 } });
   const analysis = analysisQuery.data as LottoAnalysis | undefined;
-  const draws = (drawsQuery.data ?? analysis?.recentDraws ?? []) as LottoDraw[];
+  const draws = (analysis?.recentDraws ?? []) as LottoDraw[];
   const filters = analysis?.ticketFilters ?? [];
   const passedFilters = filters.filter((filter) => filter.passed).length;
   const maxFrequency = Math.max(...(analysis?.frequency ?? []).map((item) => item.count), 1);
@@ -200,24 +216,31 @@ function AnalysisPage() {
 
   function runAnalysis(event: FormEvent) {
     event.preventDefault();
-    const numericLimit = Math.min(5000, Math.max(100, Number(limit) || 1000));
+    if (!selectedGame) return;
+    const numericLimit = Math.min(100, Math.max(5, Number(limit) || 40));
     const numericSeed = seed.trim() ? Math.min(2147483647, Math.max(0, Number(seed))) : undefined;
     setLimit(String(numericLimit));
     setSeed(numericSeed === undefined ? '' : String(numericSeed));
-    setApplied({ limit: numericLimit, seed: numericSeed });
+    setApplied({ limit: numericLimit, seed: numericSeed, stateCode, gameId: selectedGame.id });
   }
 
   function resetAnalysis() {
-    setLimit('1000'); setSeed(''); setApplied({ limit: 1000, seed: undefined });
+    setLimit('40'); setSeed(''); setStateCode('NY'); setGameId(9);
+    setApplied({ limit: 40, seed: undefined, stateCode: 'NY', gameId: 9 });
   }
 
-  if (analysisQuery.isLoading) return <LoadingWorkspace />;
+  const stateOptions = states.map((state) => <option key={state.stateCode} value={state.stateCode}>{state.stateName}</option>);
+  const gameOptions = games.map((game) => <option key={game.id} value={game.id}>{game.gameName} · {game.drawnNumbers} of {game.maxBall}</option>);
+
+  if (statesQuery.isError) return <ErrorWorkspace onRetry={() => statesQuery.refetch()} message="Could not load the state list from RapidAPI. Check that the connected account is subscribed and its API host is configured with the provider subdomain, not the full URL." />;
+  if (gamesQuery.isError) return <ErrorWorkspace onRetry={() => gamesQuery.refetch()} message="Could not load games for this state from RapidAPI." />;
+  if (statesQuery.isLoading || gamesQuery.isLoading || analysisQuery.isLoading || (!analysis && !analysisQuery.isError)) return <LoadingWorkspace />;
   if (analysisQuery.isError || !analysis) return <ErrorWorkspace onRetry={() => analysisQuery.refetch()} message={(analysisQuery.error as { error?: string })?.error ?? ''} />;
 
   return (
     <div className="grain min-h-[100dvh] bg-background">
       <div className="flex min-h-[100dvh]">
-        <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+        <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} state={analysis.stateCode} game={selectedGame} />
         <main className="min-w-0 flex-1">
           <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-border/75 bg-background/90 px-5 backdrop-blur-md md:px-8">
             <div className="flex items-center gap-3">
@@ -236,7 +259,7 @@ function AnalysisPage() {
               <div>
                 <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#e8b5a7] bg-[#fff3ed] px-2.5 py-1 font-mono text-[9px] uppercase tracking-[.16em] text-primary"><Sparkles className="h-3 w-3" /> Ensemble run complete</div>
                 <h1 data-testid="text-page-title" className="max-w-[720px] font-[var(--app-font-serif)] text-[clamp(2.25rem,5vw,4.65rem)] font-semibold leading-[.96] tracking-[-.065em] text-foreground">Read the draw.<br /><span className="text-primary">Then make a choice.</span></h1>
-                <p className="mt-4 max-w-[610px] text-sm leading-6 text-muted-foreground">A transparent NY Lotto 6/59 ticket built from {numberFormat.format(analysis.drawsLoaded)} draws, six complementary signals, and a set of deliberately visible constraints.</p>
+                <p className="mt-4 max-w-[610px] text-sm leading-6 text-muted-foreground">A transparent {analysis.stateName} {analysis.gameName} analysis built from {numberFormat.format(analysis.drawsLoaded)} draws, six complementary signals, and deliberately visible constraints.</p>
               </div>
               <form onSubmit={runAnalysis} className="w-full max-w-[400px] rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-sm)]">
                 <button data-testid="button-toggle-controls" type="button" onClick={() => setControlsOpen(!controlsOpen)} className="flex w-full items-center justify-between text-left">
@@ -244,13 +267,24 @@ function AnalysisPage() {
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${controlsOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {controlsOpen && <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3">
+                  <label className="text-[10px] text-muted-foreground">State
+                    <select data-testid="select-lottery-state" value={stateCode} onChange={(event) => setStateCode(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-2.5 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/25">
+                      {stateOptions}
+                    </select>
+                  </label>
+                  <label className="text-[10px] text-muted-foreground">Game
+                    <select data-testid="select-lottery-game" value={selectedGame?.id ?? ''} onChange={(event) => setGameId(Number(event.target.value))} disabled={gamesQuery.isLoading || games.length === 0} className="mt-1 w-full rounded-lg border border-input bg-background px-2.5 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-50">
+                      {games.length === 0 ? <option value="">No games available</option> : gameOptions}
+                    </select>
+                  </label>
                   <label className="text-[10px] text-muted-foreground">Draw history
-                    <input data-testid="input-history-limit" type="number" min="100" max="5000" value={limit} onChange={(event) => setLimit(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-2.5 py-2 font-mono text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/25" />
+                    <input data-testid="input-history-limit" type="number" min="5" max="100" value={limit} onChange={(event) => setLimit(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-2.5 py-2 font-mono text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/25" />
                   </label>
                   <label className="text-[10px] text-muted-foreground">Seed <span className="text-muted-foreground/60">(optional)</span>
                     <input data-testid="input-analysis-seed" type="number" min="0" max="2147483647" value={seed} onChange={(event) => setSeed(event.target.value)} placeholder="random" className="mt-1 w-full rounded-lg border border-input bg-background px-2.5 py-2 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-primary/25" />
                   </label>
-                  <button data-testid="button-run-analysis" type="submit" className="col-span-2 mt-1 flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-xs font-bold text-primary-foreground transition-transform hover:-translate-y-0.5"><RefreshCw className="h-3.5 w-3.5" /> Run new analysis</button>
+                  <p className="col-span-2 text-[9px] leading-4 text-muted-foreground">Each historical result uses a provider request. The 100-draw cap helps manage API plan limits.</p>
+                  <button data-testid="button-run-analysis" type="submit" disabled={!selectedGame || gamesQuery.isLoading} className="col-span-2 mt-1 flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-xs font-bold text-primary-foreground transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" /> Run new analysis</button>
                 </div>}
               </form>
             </section>
@@ -334,7 +368,7 @@ function AnalysisPage() {
               </Panel>
             </section>
 
-            <footer className="mt-12 flex flex-col justify-between gap-3 border-t border-border py-6 text-[10px] text-muted-foreground sm:flex-row"><p>Northstar Lab · NY Lotto 6/59 ensemble analysis</p><p className="flex items-center gap-1.5"><Info className="h-3 w-3" /> For inspection and entertainment, never a guarantee.</p></footer>
+            <footer className="mt-12 flex flex-col justify-between gap-3 border-t border-border py-6 text-[10px] text-muted-foreground sm:flex-row"><p>Northstar Lab · {analysis.stateName} {analysis.gameName} ensemble analysis</p><p className="flex items-center gap-1.5"><Info className="h-3 w-3" /> For inspection and entertainment, never a guarantee.</p></footer>
           </div>
         </main>
       </div>
